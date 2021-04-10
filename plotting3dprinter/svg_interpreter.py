@@ -26,10 +26,7 @@ def interpolateBezier( points, steps=10, t=None):
 def parse_coord(inp):
     return np.array([ float(next(inp)),  float(next(inp))])
 
-
-
 def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
-
     prev = None
     try:
         while True:

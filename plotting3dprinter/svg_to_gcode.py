@@ -2,11 +2,13 @@ import xml.etree.ElementTree as et
 from .svg_interpreter import svg_to_coordinate_chomper, repart
 from .raycaster import cast_rays
 import matplotlib.pyplot as plt
+import matplotlib
+
 import numpy as np
 
 def svg_to_gcode(svg_path,
                 gcode_path,
-                precision=5,
+                precision=10,
                 speed = 4600,
                 x_offset = 50,
                 y_offset = 50,
@@ -31,14 +33,14 @@ def svg_to_gcode(svg_path,
     max_y = None
     min_y = None
 
-    for i,path in enumerate(root.findall('sn:path', ns)):
+    for i,path in enumerate(root.findall('.//sn:path', ns)):
         # Parse thew path in d:
         d  = path.attrib['d'].replace(',', ' ')
         parts = d.split()
 
         coordinates = np.array(list(
             map(list, list( svg_to_coordinate_chomper(
-            inp=repart(parts)) ))
+            inp=repart(parts), PRECISION=precision) ))
         ))
 
 
@@ -75,7 +77,7 @@ def svg_to_gcode(svg_path,
         o.write(f'G1 Z{z_up} F{v_z}\n') # Perform up
 
         # iterate news items
-        for i,path in enumerate(root.findall('sn:path', ns)):
+        for i,path in enumerate(root.findall('.//sn:path', ns)):
 
             # Parse thew path in d:
             d  = path.attrib['d'].replace(',', ' ')
@@ -83,7 +85,7 @@ def svg_to_gcode(svg_path,
 
             coordinates = list(
                 map(list, list( svg_to_coordinate_chomper(
-                inp=repart(parts)) ))
+                inp=repart(parts), PRECISION=precision) ))
             )
 
             ### transform the coordinates:
@@ -148,7 +150,7 @@ def svg_to_gcode(svg_path,
                         o.write(f'G1 Z{z_draw} F{v_z}')
                         o.write(f'G1 X{x_offset+ax:.2f} Y{y_offset+ay:.2f} F{speed}\n')
                         o.write(f'G1 X{x_offset+bx:.2f} Y{y_offset+by:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_up} F{v_z}')
+                        o.write(f'G1 Z{z_up} F{v_z}\n')
 
                     else:
                         o.write(f'G1 Z{z_up} F{v_z}\n')
@@ -156,12 +158,12 @@ def svg_to_gcode(svg_path,
                         o.write(f'G1 Z{z_draw} F{v_z}')
                         o.write(f'G1 X{x_offset+bx:.2f} Y{y_offset+by:.2f} F{speed}\n')
                         o.write(f'G1 X{x_offset+ax:.2f} Y{y_offset+ay:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_up} F{v_z}')
+                        o.write(f'G1 Z{z_up} F{v_z}\n')
                     idx+=1
 
-            o.write(f'G1 Z{z_up} F{v_z}')
+            o.write(f'G1 Z{z_up} F{v_z}\n')
 
             #plt.plot( coordinates[:,0],  coordinates[:,1])
 
         print('All done')
-        plt.show()
+        plt.savefig(f'{gcode_path.replace(".gcode","")}.png')

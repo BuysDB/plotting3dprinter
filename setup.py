@@ -33,7 +33,7 @@ setup(
         ],
 
 
-    entry_points={'console_scripts': ['svgto3dprintplot=plotting3dprinter.svgto3dprintplot_cmd.py:main']},
+    entry_points={'console_scripts': ['svgto3dprintplot=plotting3dprinter.svgto3dprintplot_cmd:main']},
 
     scripts=[
 
