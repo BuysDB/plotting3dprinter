@@ -1,5 +1,6 @@
 # 2d plotting on a 3d-printer
 This python library generates GCODE from SVG paths, allowing a 3d printer to draw images with a pen.
+![Spirals plotted on Prusa MK3S](https://raw.githubusercontent.com/BuysDB/plotting3dprinter/master/examples/spiral/plotonmk3.jpg)
 
 ### Attach a pen to the printer
 In order to draw images, we need to attach a pen to the printer.
