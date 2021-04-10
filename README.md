@@ -22,7 +22,7 @@ After callibration run PEN_UP.GCODE afterwards to lift the pen back up.
 ## Convert the SVG to GCODE
 In order to just plot the contour lines (strokes) present in the svg use:
 
-`svgto3dprinterplotter example.svg -o example_outline.gcode --stroke`
+`svgto3dprintplot example.svg -o example_outline.gcode --stroke`
 
 Send the generated gcode file to your printer and enjoy!
 
