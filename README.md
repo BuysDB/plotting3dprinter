@@ -5,7 +5,10 @@ This python library generates GCODE from SVG paths, allowing a 3d printer to dra
 In order to draw images, we need to attach a pen to the printer.
 [I've used this model to attach a pen to my Mk3S](https://www.prusaprinters.org/prints/42978-pen-plotter-adapter-for-prusa-mk3s/comments)
 
-### obtain a SVG 
+### Install software
+`pip install plotting3dprinter`
+
+### obtain SVG file
 to generate GCODE a vector-based SVG image file is required.
 Currently the library only accepts **paths** made out of lines and splines (cubic and quadratic).
 Transformed paths and groups are not (yet) supported.
@@ -29,7 +32,7 @@ Send the generated gcode file to your printer and enjoy!
 ### Filled shapes
 By adding the --fill flag, shapes will be filled with horizontal lines.
 
-`svgto3dprinterplotter example.svg -o example_outline.gcode --fill`
+`svgto3dprintplot example.svg -o example_outline.gcode --fill`
 
 
 
