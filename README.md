@@ -11,7 +11,7 @@ In order to draw images, we need to attach a pen to the printer.
 ### obtain SVG file
 to generate GCODE a vector-based SVG image file is required.
 Currently the library only accepts **paths** made out of lines and splines (cubic and quadratic).
-Transformed paths and groups are not (yet) supported.
+Transformed paths and groups are not (yet) supported. The examples folder on this repo contains some compatible SVG files.
 
 Software to generate SVG images from a bitmap image which worked well for me is [Potrace](http://potrace.sourceforge.net/).
 
