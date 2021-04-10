@@ -18,9 +18,9 @@ Software to generate SVG images from a bitmap image which worked well for me is 
 ### Attach the pen at the correct height (callibration)
 In order to callibrate the height of the pen I've created a small gcode file which just puts the head in the left bottom and moves the head 2mm above the bed. This will be the drawing height (Z). 
 
-Put a paper sheet on the bed, and clamp it to the bed using magnets. Run the CALLIBRATE.GCODE file and attach the pen such that it just touches the paper.
+Put a paper sheet on the bed, and clamp it to the bed using magnets. Run the `CALLIBRATE.gcode` file and attach the pen such that it just touches the paper.
 
-After callibration run PEN_UP.GCODE afterwards to lift the pen back up.
+After callibration run `PEN_UP.gcode` afterwards to lift the pen back up.
 
 ## Convert the SVG to GCODE
 In order to just plot the contour lines (strokes) present in the svg use:
@@ -30,15 +30,6 @@ In order to just plot the contour lines (strokes) present in the svg use:
 Send the generated gcode file to your printer and enjoy!
 
 ### Filled shapes
-By adding the --fill flag, shapes will be filled with horizontal lines.
+By adding the `--fill` flag, shapes will be filled with horizontal lines.
 
 `svgto3dprintplot example.svg -o example_outline.gcode --fill`
-
-
-
-
-
-
-
-
-
