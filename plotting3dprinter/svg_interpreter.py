@@ -26,7 +26,7 @@ def interpolateBezier( points, steps=10, t=None):
 def parse_coord(inp):
     return np.array([ float(next(inp)),  float(next(inp))])
 
-def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
+def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True):
     prev = None
     try:
         while True:
@@ -36,8 +36,12 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
 
                 start = parse_coord(inp)
                 prev = start
-                yield np.nan,np.nan
-                #yield list(start)
+                yield [np.nan,np.nan], 'M'
+                yield list(start), 'M'
+
+                if verbose:
+                    print(f'M {start}')
+                    #plt.scatter([start[0]],[start[1]])
                 continue
 
             if chunk == 'm':
@@ -49,8 +53,10 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                 else:
                     start = parse_coord(inp) +prev
                 prev = start
-                #yield list(start)
-                yield np.nan,np.nan
+                yield [np.nan,np.nan], 'm'
+                yield list(start), 'm'
+                #yield [np.nan,np.nan]
+                print(f'm {start}')
                 continue
 
 
@@ -60,27 +66,29 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                 # Go to start:
                 #print("Returning to start coordinate")
                 prev= start
-                yield start
+                yield start, 'z'
+
                 #print("Done")
                 continue
 
 
             if chunk.strip()=='l':
                 # Line to command:
-                yield prev
+                yield prev, 'l'
                 cur = parse_coord(inp)+prev
-                yield cur
+                yield cur, 'l'
                 prev = cur
 
                 continue
 
             if chunk.strip()=='L':
                 # Line to command:
-                yield prev
+                yield prev, 'L'
                 cur = parse_coord(inp)
-                yield cur
+                yield cur, 'L'
                 prev = cur
-
+                if verbose:
+                    print(f'L {prev} > {cur}')
                 continue
 
             if chunk[0]=='c': # bezier mode
@@ -108,7 +116,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                         ], steps=PRECISION
 
                     ):
-                        yield np.array([x,y])
+                        yield np.array([x,y]), 'c'
 
 
                 prev = dxdy
@@ -140,7 +148,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                         ], steps=PRECISION
 
                     ):
-                        yield np.array([x,y])
+                        yield np.array([x,y]), 'C'
 
                 prev = dxdy
                 #yield prev
@@ -182,7 +190,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                         ], steps=PRECISION
 
                     ):
-                        yield np.array([x,y])
+                        yield np.array([x,y]), 'q'
 
                 prev = dxdy
                 #yield prev
@@ -212,7 +220,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
                         ], steps=PRECISION
 
                     ):
-                        yield np.array([x,y])
+                        yield np.array([x,y]), 'Q'
 
                 prev = dxdy
                 #yield prev
@@ -227,43 +235,47 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5):
             elif chunk=='h':
                 # Parse the next chunk: (single horizontal coordinate)
 
-                yield list(prev)
+                yield list(prev), 'h'
 
                 chunk2 = next(inp)
                 x = float(chunk2)
                 prev[0] += x
 
-                yield list(prev) #+start
+                yield list(prev), 'h' #+start
             elif chunk=='H':
                 # Parse the next chunk: (single horizontal coordinate)
 
-                yield list(prev)
+                yield list(prev), 'H'
 
                 chunk2 = next(inp)
                 x = float(chunk2)
                 prev[0] = x
 
-                yield list(prev) #+start
+                if verbose:
+                    print(f'H {x} ({prev})')
+
+                yield list(prev), 'H' #+start
 
             elif chunk=='v':
                 # Parse the next chunk: (single horizontal coordinate)
-                yield list(prev)
+                yield list(prev), 'v'
 
                 chunk2 = next(inp)
                 y = float(chunk2)
                 prev[1] += y
 
-                yield list(prev) #+start
+                yield list(prev), 'v' #+start
 
             elif chunk=='V':
                 # Parse the next chunk: (single horizontal coordinate)
-                yield list(prev)
+                yield list(prev), 'V'
 
                 chunk2 = next(inp)
                 y = float(chunk2)
                 prev[1] = y
-
-                yield list(prev) #+start
+                if verbose:
+                    print(f'H {y} ({prev})')
+                yield list(prev), 'V' #+start
     except StopIteration:
         pass
 
