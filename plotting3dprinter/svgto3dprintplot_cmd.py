@@ -71,7 +71,7 @@ def  main():
     argparser.add_argument(
             '-longest_edge',
             type=float,
-            default=15,
+            default=None,
             help=" Rescale longest edge of the image to this length")
 
 
