@@ -151,7 +151,9 @@ def svg_to_gcode(svg_path,
                 else:
                     if not is_down:
                         if create_outline:
-                            o.write(f'G1 X{x_offset+x:.2f} Y{y_offset+y:.2f} F{speed}\n')
+                            # Move the head to the target location, while still being up
+                            o.write(f'G1 X{x_offset+x:.2f} Y{y_offset+y:.2f} Z{z_up} F{speed}\n')
+
                             o.write(f'G1 Z{z_draw} F{v_z}\n')
                             is_down=True
                         prev=None
