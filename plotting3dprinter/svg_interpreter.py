@@ -1,7 +1,7 @@
 from more_itertools import windowed
 import matplotlib.pyplot as plt
 import numpy as np
-
+import xml.etree.ElementTree as et
 
 def interpolateBezier( points, steps=10, t=None):
     points = tuple(points)
@@ -286,3 +286,46 @@ def repart(inp):
             yield p[1:]
         else:
             yield p
+
+
+
+def svg_to_segment_blocks(svg_path,precision=5):
+    tree = et.parse(svg_path)
+    ns = {'sn': 'http://www.w3.org/2000/svg'}
+    root = tree.getroot()
+    for i,path in enumerate(root.findall('.//sn:path', ns)):
+        # Parse the path in d:
+        d  = path.attrib['d'].replace(',', ' ')
+        parts = d.split()
+        coordinates = []
+        for (x,y),c in svg_to_coordinate_chomper(
+            inp=repart(parts), PRECISION=precision):
+            coordinates.append([x,y])
+
+        if len(coordinates)>0:
+            yield np.array(list(coordinates_to_segments( coordinates )))
+
+
+def coordinates_to_segments(coordinates):
+    for (x,y) in coordinates:
+
+        if np.isnan(x):
+            current = x,y
+            is_down=False
+            continue
+        else:
+            if not is_down:
+                # Move the head to the target location, while still being up
+                is_down=True
+                prev=None
+
+            if (x,y) != prev:
+                if  not np.isnan(current[0]):
+
+                    yield [[current[0],current[1]], [x, y]]
+
+                current = x,y
+            else:
+                # Dont write duplicate coordinates. Waste of space
+                pass
+            prev = current
