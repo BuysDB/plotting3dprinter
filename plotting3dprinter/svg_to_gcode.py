@@ -1,10 +1,48 @@
 import xml.etree.ElementTree as et
-from .svg_interpreter import svg_to_coordinate_chomper, repart
+from .svg_interpreter import svg_to_coordinate_chomper, repart, svg_to_segment_blocks
 from .raycaster import cast_rays
 import matplotlib.pyplot as plt
 import matplotlib
-
+from copy import copy
 import numpy as np
+
+
+
+def get_optimal_ordering(blockset):
+    remaining_blocks = copy(blockset)
+    i = 0
+
+    current_block = remaining_blocks.pop()
+    yield current_block[-1]
+
+    while len(remaining_blocks)>0:
+        # find nearest block
+        if len(remaining_blocks)==0:
+            return
+        end = current_block[-1][-1][1]
+
+        best = None
+        best_dist = None
+        best_idx = None
+
+        for j,rblock in enumerate(remaining_blocks):
+
+            (xstart,ystart) = rblock[-1][0][0]
+
+            dist = np.sqrt( np.power(xstart-end[0],2) +
+                           np.power(ystart-end[1],2))
+            #print(dist)
+            if best is None or dist<best_dist:
+                best = rblock
+                best_dist=dist
+                best_idx=j
+
+        print('next best block is ',best_idx, best_dist )
+        current_block = best
+
+        yield best[-1]
+        remaining_blocks.pop(best_idx)
+
 
 def svg_to_gcode(svg_path,
                 gcode_path,
@@ -17,8 +55,21 @@ def svg_to_gcode(svg_path,
                 create_outline=True,
                 create_fill=False,
                 min_fill_segment_size=2, # Don't fill with lines shorter than this value
-                longest_edge = None # Rescale longest edge to this value
+                longest_edge = None, # Rescale longest edge to this value
+                bed_size_x=250,
+                bed_size_y=200,
  ):
+
+    cmdcolor = {
+        'L':'r',
+        'l':'r',
+        'M':'k',
+        'V':'b',
+        'v':'b',
+        'H':'b',
+        'h':'b'
+
+    }
 
     v_z=speed
     tree = et.parse(svg_path)
@@ -91,122 +142,78 @@ def svg_to_gcode(svg_path,
         o.write('G28 X Y\n') # perform home
         o.write(f'G1 Z{z_up} F{v_z}\n') # Perform up
 
-        # iterate news items
-        for i,path in enumerate(root.findall('.//sn:path', ns)):
-            pathcolor = pathcolors.colors[i%pathcolors.N]
-            # Parse thew path in d:
-            d  = path.attrib['d'].replace(',', ' ')
-            parts = d.split()
+
+        segment_blocks = list( svg_to_segment_blocks(svg_path) )
+        prev=None
+        # Determine block, start and ends
+        blockset = []
+        for block in segment_blocks:
+            blockset.append([block[0][0], block[-1][1], block])
+
+        if create_outline:
+            prev = None
+            for block in get_optimal_ordering(blockset):
+                for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
 
 
 
 
-            #coordinates = [ [x,y]  for x,y,c svg_to_coordinate_chomper(
-        #        inp=repart(parts), PRECISION=precision)] ]
-            coordinates = []
-            commands = []
-            for (x,y),c in svg_to_coordinate_chomper(
-                inp=repart(parts), PRECISION=precision):
-                coordinates.append([x,y])
-                commands.append(c)
+                    if longest_edge is not None:
+                        x1-=min_x
+                        x2-=min_x
+                        y1-=min_y
+                        y2-=min_y
+                        # Convert video coordinates to xy coordinates (flip y)
+                        y1 = (max_y-min_y)-(y1)
+                        y2 = (max_y-min_y)-(y2)
+                        # Scale
+                        x1*=scaler
+                        x2*=scaler
+                        y1*=scaler
+                        y2*=scaler
 
-            ### transform the coordinates:
-            coordinates = np.array(coordinates)
-            # translate:
-            if longest_edge is not None:
-                coordinates[:,0]-=min_x
-                coordinates[:,1]-=min_y
-                # Convert video coordinates to xy coordinates (flip y)
-                coordinates[:,1] = (max_y-min_y)-(coordinates[:,1])
-                # Scale
+                    if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
+                        raise ValueError('Coordinates out side of printer bed ')
 
-                coordinates*=scaler
+                    if prev is None or prev!=(x1,y1):
+                        # Perform travel move:
+                        print('traveling ...', (x1,y1))
+                        if prev is not None:
+                            # go up first
+                            o.write(f'G1 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{speed}\n')
+                            plt.plot([prev[0],x1],[prev[1],y2],c='grey')
+                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{speed}\n')
+                        # Drop pen down at current position
+                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
 
-            ### Generate the outline GCODE, and store the segments
-            is_down = False
-            current = 0,0
-            prev= None
-            segments = []
+                    if prev!=(x1,y1):
+                        print(x1,y1)
 
-            for (x,y), command in zip(coordinates,commands):
+                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
+                    print(x2,y2)
+                    o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
+                    plt.plot([x1,x2],[y1,y2],c='r')
+                    prev = (x2,y2)
 
-                cmdcolor = {
-                    'L':'r',
-                    'l':'r',
-                    'M':'k',
-                    'V':'b',
-                    'v':'b',
-                    'H':'b',
-                    'h':'b'
+            #o.write(f'#NEXT\n')
 
-                }
+            # block ended.. travel
+            #o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y:.2f} Z{z_up} F{speed}\n')
 
-                if np.isnan(x):
-                    # penup:
-                    if create_outline:
-                        o.write(f'G1 Z{z_up} F{v_z}\n')
-                    current = x,y
-                    is_down=False
-                    continue
-                else:
-                    if not is_down:
-                        if create_outline:
-                            # Move the head to the target location, while still being up
-                            o.write(f'G1 X{x_offset+x:.2f} Y{y_offset+y:.2f} Z{z_up} F{speed}\n')
+        o.write(f'G1 Z{z_up+50} F{speed}\n')
 
-                            o.write(f'G1 Z{z_draw} F{v_z}\n')
-                            is_down=True
-                        prev=None
-
-                    if (x,y) != prev:
-                        if  not np.isnan(current[0]):
-                            if create_outline:
-                                o.write(f'G1 X{x_offset+x:.2f} Y{y_offset+y:.2f} F{speed}\n')
-                            segments.append( [[current[0],current[1]], [x, y]])
-                            plt.plot( [current[0],x], [current[1], y],
-                            c=cmdcolor.get(command,'grey') #pathcolor
-                            ,lw=0.5)
-                        current = x,y
-                    else:
-                        # Dont write duplicate coordinates. Waste of space
-                        pass
-                    prev = current
-
-            o.write(f'G1 Z{z_up} F{v_z}\n')
-            segarr = np.array( segments )
-            coords = np.array( coordinates )
-            coords = coords[np.isnan( coords ).sum(1)==0]
-
-            if create_fill:
-                prev = None
-                idx=0
-                for ((ax,ay),(bx,by)) in  cast_rays(segarr, coords, 1, debug=True) :
-
-                    # Dont write very tiny segments
-                    d = np.sqrt( np.power(ax-bx,2) + np.power(ay-by,2) )
-                    if d<min_fill_segment_size:
-                        continue
-
-                    if idx%2==0: # Switch direction to not put stress on the pen in one direction only
-                        o.write(f'G1 Z{z_up} F{v_z}\n')
-                        o.write(f'G1 X{x_offset+ax:.2f} Y{y_offset+ay:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_draw} F{v_z}')
-                        o.write(f'G1 X{x_offset+ax:.2f} Y{y_offset+ay:.2f} F{speed}\n')
-                        o.write(f'G1 X{x_offset+bx:.2f} Y{y_offset+by:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_up} F{v_z}\n')
-
-                    else:
-                        o.write(f'G1 Z{z_up} F{v_z}\n')
-                        o.write(f'G1 X{x_offset+bx:.2f} Y{y_offset+by:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_draw} F{v_z}')
-                        o.write(f'G1 X{x_offset+bx:.2f} Y{y_offset+by:.2f} F{speed}\n')
-                        o.write(f'G1 X{x_offset+ax:.2f} Y{y_offset+ay:.2f} F{speed}\n')
-                        o.write(f'G1 Z{z_up} F{v_z}\n')
-                    idx+=1
-
-            o.write(f'G1 Z{z_up} F{v_z}\n')
-
-            #plt.plot( coordinates[:,0],  coordinates[:,1])
+        #plt.plot( coordinates[:,0],  coordinates[:,1])
 
         print('All done')
+        plt.xlim(-10,bed_size_x+10)
+
+        plt.axvline(0,c='r',ls=':')
+        plt.axvline(bed_size_x,c='r',ls=':')
+        plt.axvline(bed_size_x-x_offset,c='r',ls=':')
+
+        plt.axhline(0,c='r',ls=':')
+        plt.axhline(bed_size_y,c='r',ls=':')
+        plt.axhline(bed_size_y-y_offset,c='r',ls=':')
+
+
         plt.savefig(f'{gcode_path.replace(".gcode","")}.png', dpi=300)
