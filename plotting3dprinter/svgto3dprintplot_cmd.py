@@ -4,7 +4,7 @@ from .svg_to_gcode import svg_to_gcode
 def  main():
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='Investigate dinucleotide usage')
+        description='Convert SVG into gcode for plotting on a 3d printer')
     argparser.add_argument(
         'svg_path',
         type=str,
