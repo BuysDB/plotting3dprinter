@@ -4,7 +4,7 @@ from .svg_to_gcode import svg_to_gcode
 def  main():
     argparser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        description='Investigate dinucleotide usage')
+        description='Convert SVG into gcode for plotting on a 3d printer')
     argparser.add_argument(
         'svg_path',
         type=str,
@@ -38,23 +38,29 @@ def  main():
             help="speed of XY movements")
 
 
+    """ True offset:
+    G1 X34.13 F3600
+    G1 Y32.36 F3600
+    """
+
     argparser.add_argument(
             '-x_offset',
             type=int,
-            default=50,
+            default=45,
             help="X - Offset/margin from bottom left corner of print bed in mm")
 
     argparser.add_argument(
             '-y_offset',
             type=int,
-            default=50,
-            help="Y - Offset/margin from bottom left corner of print bed in mm")
+            default=40,
+            help="Y - Offset/margin from bottom of print bed in mm")
 
     argparser.add_argument(
             '-z_draw',
             type=int,
             default=5,
             help="Z axis position for drawing")
+
 
     argparser.add_argument(
             '-z_up',
@@ -74,6 +80,18 @@ def  main():
             default=None,
             help=" Rescale longest edge of the image to this length")
 
+    argparser.add_argument(
+            '-bed_size_x',
+            type=float,
+            default=250,
+            help="X size of bed in mm")
+
+    argparser.add_argument(
+            '-bed_size_y',
+            type=float,
+            default=200,
+            help="Y size of bed in mm")
+
 
     args = argparser.parse_args()
     svg_to_gcode(
@@ -89,5 +107,7 @@ def  main():
                 create_fill=args.fill,
                 min_fill_segment_size=args.min_fill_segment_size, # Don't fill with lines shorter than this value
                 longest_edge = args.longest_edge, # Rescale longest edge to this value
+                bed_size_x=args.bed_size_x,
+                bed_size_y=args.bed_size_y,
 
     )
