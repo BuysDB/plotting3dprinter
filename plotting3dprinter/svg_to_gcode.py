@@ -150,49 +150,50 @@ def svg_to_gcode(svg_path,
         for block in segment_blocks:
             blockset.append([block[0][0], block[-1][1], block])
 
-        prev = None
-        for block in get_optimal_ordering(blockset):
-            for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
+        if create_outline:
+            prev = None
+            for block in get_optimal_ordering(blockset):
+                for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
 
 
 
 
-                if longest_edge is not None:
-                    x1-=min_x
-                    x2-=min_x
-                    y1-=min_y
-                    y2-=min_y
-                    # Convert video coordinates to xy coordinates (flip y)
-                    y1 = (max_y-min_y)-(y1)
-                    y2 = (max_y-min_y)-(y2)
-                    # Scale
-                    x1*=scaler
-                    x2*=scaler
-                    y1*=scaler
-                    y2*=scaler
+                    if longest_edge is not None:
+                        x1-=min_x
+                        x2-=min_x
+                        y1-=min_y
+                        y2-=min_y
+                        # Convert video coordinates to xy coordinates (flip y)
+                        y1 = (max_y-min_y)-(y1)
+                        y2 = (max_y-min_y)-(y2)
+                        # Scale
+                        x1*=scaler
+                        x2*=scaler
+                        y1*=scaler
+                        y2*=scaler
 
-                if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
-                    raise ValueError('Coordinates out side of printer bed ')
+                    if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
+                        raise ValueError('Coordinates out side of printer bed ')
 
-                if prev is None or prev!=(x1,y1):
-                    # Perform travel move:
-                    print('traveling ...', (x1,y1))
-                    if prev is not None:
-                        # go up first
-                        o.write(f'G1 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{speed}\n')
-                        plt.plot([prev[0],x1],[prev[1],y2],c='grey')
-                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{speed}\n')
-                    # Drop pen down at current position
-                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
+                    if prev is None or prev!=(x1,y1):
+                        # Perform travel move:
+                        print('traveling ...', (x1,y1))
+                        if prev is not None:
+                            # go up first
+                            o.write(f'G1 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{speed}\n')
+                            plt.plot([prev[0],x1],[prev[1],y2],c='grey')
+                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{speed}\n')
+                        # Drop pen down at current position
+                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
 
-                if prev!=(x1,y1):
-                    print(x1,y1)
+                    if prev!=(x1,y1):
+                        print(x1,y1)
 
-                o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
-                print(x2,y2)
-                o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
-                plt.plot([x1,x2],[y1,y2],c='r')
-                prev = (x2,y2)
+                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
+                    print(x2,y2)
+                    o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
+                    plt.plot([x1,x2],[y1,y2],c='r')
+                    prev = (x2,y2)
 
             #o.write(f'#NEXT\n')
 
