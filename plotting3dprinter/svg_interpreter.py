@@ -26,7 +26,7 @@ def interpolateBezier( points, steps=10, t=None):
 def parse_coord(inp):
     return np.array([ float(next(inp)),  float(next(inp))])
 
-def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True):
+def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=False):
     prev = None
     try:
         while True:
@@ -56,7 +56,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True
                 yield [np.nan,np.nan], 'm'
                 yield list(start), 'm'
                 #yield [np.nan,np.nan]
-                print(f'm {start}')
+                #print(f'm {start}')
                 continue
 
 
@@ -155,7 +155,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True
                 continue
 
             if chunk[0]=='A': # ARC mode:
-                print('Got arc')
+                #print('Got arc')
                 rx,ry = parse_coord(inp)
 
                 x_ax_rot = float( next(inp) )
@@ -174,7 +174,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True
                 dxdy1 = parse_coord(inp) + prev
                 dxdy = parse_coord(inp)  + prev
 
-                print('Q Bezier',prev,dxdy1, dxdy)
+                #print('Q Bezier',prev,dxdy1, dxdy)
 
                 if yield_control:
                     yield dxdy1
@@ -228,7 +228,7 @@ def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=True
 
             if chunk not in 'HhVv':
                 raise ValueError(f'Unknown command {chunk}')
-                print("MISS:",chunk)
+                #print("MISS:",chunk)
                 prev +=  parse_coord(chunk)
                 #print(prev)
                 yield list(prev) #prev #+start
