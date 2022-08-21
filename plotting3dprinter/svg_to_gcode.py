@@ -173,7 +173,7 @@ def svg_to_gcode(svg_path,
                         y2*=scaler
 
                     if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
-                        raise ValueError('Coordinates out side of printer bed ')
+                        raise ValueError(f'Coordinates generated which fall outside of supplied printer bed size, adjust printer bed size or add "-longest_edge {min(bed_size_x,bed_size_y)}" to the command to scale the coordinates')
 
                     if prev is None or prev!=(x1,y1):
                         # Perform travel move:
