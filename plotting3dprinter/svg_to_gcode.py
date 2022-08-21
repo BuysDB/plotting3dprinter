@@ -7,6 +7,8 @@ from copy import copy
 import numpy as np
 
 
+def get_pass_list(z_surface:float, z_bottom:float, passes:int) -> list:
+    return np.linspace(z_surface,z_bottom,passes).tolist()
 
 def get_optimal_ordering(blockset):
     remaining_blocks = copy(blockset)
@@ -47,19 +49,34 @@ def get_optimal_ordering(blockset):
 def svg_to_gcode(svg_path,
                 gcode_path,
                 precision=10,
-                speed = 4600,
+                xy_feedrate = 4600,
+                z_feedrate = 250,
                 x_offset = 50,
                 y_offset = 50,
-                z_draw = 5,
+                z_surface = 5,
                 z_up = 7,
+                z_safe = 20, # the z-coordinate of the CNC tool where it is well-above the surface
+                cut_depth = 0,
                 create_outline=True,
                 create_fill=False,
                 min_fill_segment_size=2, # Don't fill with lines shorter than this value
                 longest_edge = None, # Rescale longest edge to this value
                 bed_size_x=250,
                 bed_size_y=200,
+                verbose=False,
+                passes=1, # number of passes (relevant for cutting material)
  ):
+    assert cut_depth > 0, 'The cut depth must be a positive value [mm].'
+    z_bottom = z_surface - cut_depth
 
+    assert z_surface < z_up, 'The z-coordinate of the drawing/cutting surface must be below the safe travel height of the CNC tool.'
+    assert z_safe >= z_up, 'The safe height of the CNC tool must be higher than the height at which the tool moves over the surface.'
+
+    if z_bottom == z_surface:
+        assert passes == 1, 'You only need to do 1 pass with the CNC tool since the bottom z-coordinate is equal to the surface z-coordinate.'
+    else:
+        assert passes > 1, 'You should set passes to a value greater than 1 since the bottom z-coordinate is lower than the surface coordinate.'
+    
     cmdcolor = {
         'L':'r',
         'l':'r',
@@ -71,7 +88,7 @@ def svg_to_gcode(svg_path,
 
     }
 
-    v_z=speed
+    z_feedrate=xy_feedrate
     tree = et.parse(svg_path)
     # Add namespace for svg
     ns = {'sn': 'http://www.w3.org/2000/svg'}
@@ -97,7 +114,7 @@ def svg_to_gcode(svg_path,
         coordinates = []
         commands = []
         for t in svg_to_coordinate_chomper(
-            inp=repart(parts), PRECISION=precision):
+            inp=repart(parts), PRECISION=precision, verbose=verbose):
             #print(t)
             (x,y),c = t
 
@@ -138,71 +155,76 @@ def svg_to_gcode(svg_path,
     with open(gcode_path,'w') as o:
 
         # Move pen up:
-        o.write(f'G1 Z{z_up+20} F{v_z}\n') # Perform up
-        o.write('G28 X Y\n') # perform home
-        o.write(f'G1 Z{z_up} F{v_z}\n') # Perform up
+        o.write(f'G01 Z{z_up+z_safe} F{z_feedrate}\n') # Perform up
+        o.write('G28 X0 Y0\n') # perform home
+        o.write(f'G01 Z{z_up} F{z_feedrate}\n') # Perform up
 
+        # loop over passes
+        pass_list = get_pass_list(z_surface, z_bottom, passes)
+        for z_pass in pass_list:
 
-        segment_blocks = list( svg_to_segment_blocks(svg_path) )
-        prev=None
-        # Determine block, start and ends
-        blockset = []
-        for block in segment_blocks:
-            blockset.append([block[0][0], block[-1][1], block])
+            segment_blocks = list( svg_to_segment_blocks(svg_path) )
+            prev=None
+            # Determine block, start and ends
+            blockset = []
+            for block in segment_blocks:
+                blockset.append([block[0][0], block[-1][1], block])
 
-        if create_outline:
-            prev = None
-            for block in get_optimal_ordering(blockset):
-                for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
+            if create_outline:
+                prev = None
+                for block in get_optimal_ordering(blockset):
+                    for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
 
-                    if longest_edge is not None:
-                        x1-=min_x
-                        x2-=min_x
-                        y1-=min_y
-                        y2-=min_y
-                        # Convert video coordinates to xy coordinates (flip y)
-                        y1 = (max_y-min_y)-(y1)
-                        y2 = (max_y-min_y)-(y2)
-                        # Scale
-                        x1*=scaler
-                        x2*=scaler
-                        y1*=scaler
-                        y2*=scaler
+                        if longest_edge is not None:
+                            x1-=min_x
+                            x2-=min_x
+                            y1-=min_y
+                            y2-=min_y
+                            # Convert video coordinates to xy coordinates (flip y)
+                            y1 = (max_y-min_y)-(y1)
+                            y2 = (max_y-min_y)-(y2)
+                            # Scale
+                            x1*=scaler
+                            x2*=scaler
+                            y1*=scaler
+                            y2*=scaler
 
-                    if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
-                        raise ValueError(f'Coordinates generated which fall outside of supplied printer bed size, adjust printer bed size or add "-longest_edge {min(bed_size_x,bed_size_y)}" to the command to scale the coordinates')
+                        if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
+                            raise ValueError(f'Coordinates generated which fall outside of supplied printer bed size, adjust printer bed size or add "-longest_edge {min(bed_size_x,bed_size_y)}" to the command to scale the coordinates')
 
-                    if prev is None or prev!=(x1,y1):
-                        # Perform travel move:
-                        print('traveling ...', (x1,y1))
-                        if prev is not None:
-                            # go up first
-                            o.write(f'G1 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{speed}\n')
-                            plt.plot([prev[0],x1],[prev[1],y2],c='grey')
-                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{speed}\n')
-                        # Drop pen down at current position
-                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
+                        if prev is None or prev!=(x1,y1):
+                            # Perform travel move:
+                            print('traveling ...', (x1,y1))
+                            if prev is not None:
+                                # go up first
+                                o.write(f'G01 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{xy_feedrate}\n')
+                                plt.plot([prev[0],x1],[prev[1],y2],c='grey')
+                            o.write(f'G01 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{xy_feedrate}\n')
+                            # Drop pen down at current position
+                            o.write(f'G01 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_pass} F{z_feedrate}\n')
 
-                    #if prev!=(x1,y1):
-                    #    print(x1,y1)
+                        #if prev!=(x1,y1):
+                        #    print(x1,y1)
 
-                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
-                    #print(x2,y2)
-                    o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
-                    plt.plot([x1,x2],[y1,y2],c='r')
-                    prev = (x2,y2)
+                        o.write(f'G01 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_pass} F{xy_feedrate}\n')
+                        #print(x2,y2)
+                        o.write(f'G01 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_pass} F{xy_feedrate}\n')
+                        plt.plot([x1,x2],[y1,y2],c='r')
+                        prev = (x2,y2)
 
-            #o.write(f'#NEXT\n')
+                #o.write(f'#NEXT\n')
 
-            # block ended.. travel
-            #o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y:.2f} Z{z_up} F{speed}\n')
+                # block ended.. travel
+                #o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y:.2f} Z{z_up} F{xy_feedrate}\n')
 
-        o.write(f'G1 Z{z_up+50} F{speed}\n')
+        o.write(f'G01 Z{z_up+z_safe} F{xy_feedrate}\n')
+        o.write(f'G28 X0 Y0') # go back to home position
 
         #plt.plot( coordinates[:,0],  coordinates[:,1])
 
         print('All done')
         plt.xlim(-10,bed_size_x+10)
+        plt.ylim(-10,bed_size_y+10)
 
         plt.axvline(0,c='r',ls=':')
         plt.axvline(bed_size_x,c='r',ls=':')
