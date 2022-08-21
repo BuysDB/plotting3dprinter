@@ -98,7 +98,7 @@ def svg_to_gcode(svg_path,
         commands = []
         for t in svg_to_coordinate_chomper(
             inp=repart(parts), PRECISION=precision):
-            print(t)
+            #print(t)
             (x,y),c = t
 
             coordinates.append([x,y])
@@ -155,9 +155,6 @@ def svg_to_gcode(svg_path,
             for block in get_optimal_ordering(blockset):
                 for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
 
-
-
-
                     if longest_edge is not None:
                         x1-=min_x
                         x2-=min_x
@@ -186,11 +183,11 @@ def svg_to_gcode(svg_path,
                         # Drop pen down at current position
                         o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
 
-                    if prev!=(x1,y1):
-                        print(x1,y1)
+                    #if prev!=(x1,y1):
+                    #    print(x1,y1)
 
                     o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
-                    print(x2,y2)
+                    #print(x2,y2)
                     o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
                     plt.plot([x1,x2],[y1,y2],c='r')
                     prev = (x2,y2)
