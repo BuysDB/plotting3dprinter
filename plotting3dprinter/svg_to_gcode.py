@@ -6,6 +6,22 @@ import matplotlib
 from copy import copy
 import numpy as np
 
+def get_optimal_scaler(bed_size_x:int,bed_size_y:int,im_length_x:int, im_length_y:int, longest_edge:float):
+    X = bed_size_x
+    Y = bed_size_y
+    a = im_length_x
+    b = im_length_y
+    if ((X/Y)-1)*((a/b)-1) >= 0: # if the aspect ratio of the image and the print bed are similar...
+        S = np.linspace(0,1,10000)
+        dfds = np.array([-2*a*(X-s*a) - 2*b*(Y-s*b) for s in S]) # obtained from the derivative of f(s) = ((X - a*s)^2 + (Y - b*s)^2) where s is the scaler
+        condition = np.array([(Y - s*b) >= 0 and (X - s*a) >= 0 for s in S])
+        scaler_idx = np.argmin(np.abs(dfds)[condition])
+        scaler = S[scaler_idx]
+    else:
+        scale_x = longest_edge/im_length_x
+        scale_y = longest_edge/im_length_y
+        scaler = min(scale_x,scale_y)
+    return scaler
 
 def get_pass_list(z_surface:float, z_bottom:float, passes:int) -> list:
     return np.linspace(z_surface,z_bottom,passes).tolist()
@@ -66,7 +82,7 @@ def svg_to_gcode(svg_path,
                 verbose=False,
                 passes=1, # number of passes (relevant for cutting material)
  ):
-    assert cut_depth > 0, 'The cut depth must be a positive value [mm].'
+    assert cut_depth >= 0, 'The cut depth must be a positive value [mm] (or 0 in the case of drawing).'
     z_bottom = z_surface - cut_depth
 
     assert z_surface < z_up, 'The z-coordinate of the drawing/cutting surface must be below the safe travel height of the CNC tool.'
@@ -88,7 +104,6 @@ def svg_to_gcode(svg_path,
 
     }
 
-    z_feedrate=xy_feedrate
     tree = et.parse(svg_path)
     # Add namespace for svg
     ns = {'sn': 'http://www.w3.org/2000/svg'}
@@ -144,9 +159,7 @@ def svg_to_gcode(svg_path,
 
     # perform scaling such that the longest edge < longest_edge mm
     if longest_edge is not None:
-        scale_x = longest_edge/(max_x - min_x)
-        scale_y = longest_edge/(max_y - min_y)
-        scaler = min(scale_x,scale_y)
+        scaler = get_optimal_scaler(bed_size_x,bed_size_y,max_x - min_x, max_y - min_y, longest_edge)
 
     fig, ax = plt.subplots()
 
