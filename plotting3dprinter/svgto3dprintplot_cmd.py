@@ -23,6 +23,10 @@ def  main():
             '--fill',
             action='store_true',
             help="Fill paths using ray-casting")
+    argparser.add_argument(
+            '--verbose',
+            action='store_true',
+            help="Show some plots during the SVG coordinate creation process.")
 
     argparser.add_argument(
             '-precision',
@@ -32,11 +36,16 @@ def  main():
 
 
     argparser.add_argument(
-            '-speed',
+            '-xy_feedrate',
             type=int,
-            default=3600,
-            help="speed of XY movements")
+            default=1000,
+            help="speed of XY movements [mm/s]")
 
+    argparser.add_argument(
+            '-z_feedrate',
+            type=int,
+            default=200,
+            help="speed of Z movements [mm/s]")
 
     """ True offset:
     G1 X34.13 F3600
@@ -56,17 +65,29 @@ def  main():
             help="Y - Offset/margin from bottom of print bed in mm")
 
     argparser.add_argument(
-            '-z_draw',
+            '-z_surface',
             type=int,
-            default=5,
-            help="Z axis position for drawing")
+            default=-2,
+            help="Z-coordinate for drawing/cutting to begin [mm].")
 
 
     argparser.add_argument(
             '-z_up',
             type=int,
-            default=7,
-            help="Z axis position for transport moves")
+            default=0,
+            help="Z-coordinate height for transport moves [mm].")
+
+    argparser.add_argument(
+            '-z_safe',
+            type=int,
+            default=0,
+            help="Amount to add to z_up to determine the CNC tool starting and ending Z-coordinate.")
+
+    argparser.add_argument(
+            '-cut_depth',
+            type=int,
+            default=0,
+            help="If cutting material, how deep to go [mm]. Default = 0")
 
     argparser.add_argument(
             '-min_fill_segment_size',
@@ -92,22 +113,33 @@ def  main():
             default=200,
             help="Y size of bed in mm")
 
+    argparser.add_argument(
+            '-num_passes',
+            type=int,
+            default=1,
+            help="Number of passes for CNC tool to perform.")
+        
+
 
     args = argparser.parse_args()
     svg_to_gcode(
-                args.svg_path,
-                args.gcode_path,
-                precision=args.precision,
-                speed = args.speed,
-                x_offset = args.x_offset,
-                y_offset = args.y_offset,
-                z_draw = args.z_draw,
-                z_up = args.z_up,
-                create_outline=args.stroke,
-                create_fill=args.fill,
-                min_fill_segment_size=args.min_fill_segment_size, # Don't fill with lines shorter than this value
-                longest_edge = args.longest_edge, # Rescale longest edge to this value
-                bed_size_x=args.bed_size_x,
-                bed_size_y=args.bed_size_y,
-
+        svg_path=args.svg_path,
+        gcode_path=args.gcode_path,
+        precision=args.precision,
+        xy_feedrate=args.xy_feedrate,
+        z_feedrate=args.z_feedrate,
+        x_offset=args.x_offset,
+        y_offset=args.y_offset,
+        z_surface=args.z_surface,
+        z_up=args.z_up,
+        z_safe=args.z_safe,
+        cut_depth=args.cut_depth,
+        create_outline=args.stroke,
+        create_fill=args.fill,
+        min_fill_segment_size=args.min_fill_segment_size,
+        longest_edge=args.longest_edge,
+        bed_size_x=args.bed_size_x,
+        bed_size_y=args.bed_size_y,
+        verbose=args.verbose,
+        passes=args.num_passes,
     )

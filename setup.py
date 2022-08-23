@@ -20,7 +20,7 @@ setup(
 
     name='plotting3dprinter',
     version=version['__version__'],
-    description='Generate gcode to plot on a 3d printer with a pen',
+    description='Generate gcode to plot on a 3d printer with a pen or cut from material.',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Buys de Barbanson',
