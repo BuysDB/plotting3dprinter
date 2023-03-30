@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 from copy import copy
 import numpy as np
-
+from itertools import chain
 
 
 def get_optimal_ordering(blockset):
@@ -58,6 +58,11 @@ def svg_to_gcode(svg_path,
                 longest_edge = None, # Rescale longest edge to this value
                 bed_size_x=250,
                 bed_size_y=200,
+                style_filter=None,
+                scale_factor = None,
+                ray_distance=4,
+                ignoreids=None
+
  ):
 
     cmdcolor = {
@@ -84,49 +89,58 @@ def svg_to_gcode(svg_path,
     max_y = None
     min_y = None
 
+
     for i,path in enumerate(root.findall('.//sn:path', ns)):
         # Parse thew path in d:
+        keep_path = True
+        if style_filter is not None:
+            if style_filter not in path.attrib.get('style',''):
+                keep_path = False
+        if 'd' not in path.attrib:
+            continue
+
         d  = path.attrib['d'].replace(',', ' ')
         parts = d.split()
-
-        #coordinates = np.array(list(
-    #        map(list, list( svg_to_coordinate_chomper(
-    #        inp=repart(parts), PRECISION=precision) ))
-#        ))
-
+        unfiltered_coordinates = []
         coordinates = []
         commands = []
         for t in svg_to_coordinate_chomper(
             inp=repart(parts), PRECISION=precision):
             #print(t)
             (x,y),c = t
-
-            coordinates.append([x,y])
-            commands.append(c)
+            unfiltered_coordinates.append([x,y])
+            if keep_path:
+                coordinates.append([x,y])
+                commands.append(c)
 
         #coordinates = [ [x,y]  for (x,y),c in  svg_to_coordinate_chomper(
     #        inp=repart(parts), PRECISION=precision)]
         coordinates = np.array(coordinates)
+        unfiltered_coordinates = np.array(unfiltered_coordinates)
 
-        bot = np.nanmin( coordinates[:,0])
+        bot = np.nanmin( unfiltered_coordinates[:,0])
         if min_x is None or bot<min_x:
             min_x = bot
 
-        top = np.nanmax( coordinates[:,0])
+        top = np.nanmax( unfiltered_coordinates[:,0])
         if max_x is None or top>max_x:
             max_x = top
 
 
-        bot = np.nanmin( coordinates[:,1])
+        bot = np.nanmin( unfiltered_coordinates[:,1])
         if min_y is None or bot<min_y:
             min_y = bot
 
-        top = np.nanmax( coordinates[:,1])
+        top = np.nanmax( unfiltered_coordinates[:,1])
         if max_y is None or top>max_y:
             max_y = top
 
     # perform scaling such that the longest edge < longest_edge mm
-    if longest_edge is not None:
+    scaler = 1
+    if scale_factor is not None:
+        scaler = scale_factor
+
+    elif longest_edge is not None:
         scale_x = longest_edge/(max_x - min_x)
         scale_y = longest_edge/(max_y - min_y)
         scaler = min(scale_x,scale_y)
@@ -143,7 +157,10 @@ def svg_to_gcode(svg_path,
         o.write(f'G1 Z{z_up} F{v_z}\n') # Perform up
 
 
-        segment_blocks = list( svg_to_segment_blocks(svg_path) )
+        segment_blocks = list(
+            svg_to_segment_blocks(svg_path,
+            path_filter=None if style_filter is None else lambda path: style_filter in path.attrib.get('style',''))
+        )
         prev=None
         # Determine block, start and ends
         blockset = []
