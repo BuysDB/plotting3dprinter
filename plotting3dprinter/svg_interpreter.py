@@ -289,11 +289,14 @@ def repart(inp):
 
 
 
-def svg_to_segment_blocks(svg_path,precision=5):
+def svg_to_segment_blocks(svg_path,precision=5, path_filter=None):
     tree = et.parse(svg_path)
     ns = {'sn': 'http://www.w3.org/2000/svg'}
     root = tree.getroot()
     for i,path in enumerate(root.findall('.//sn:path', ns)):
+        if path_filter is not None and not path_filter(path):
+            continue
+
         # Parse the path in d:
         d  = path.attrib['d'].replace(',', ' ')
         parts = d.split()
