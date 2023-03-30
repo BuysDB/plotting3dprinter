@@ -167,47 +167,93 @@ def svg_to_gcode(svg_path,
         for block in segment_blocks:
             blockset.append([block[0][0], block[-1][1], block])
 
-        if create_outline:
-            prev = None
-            for block in get_optimal_ordering(blockset):
-                for ii,( (x1,y1),(x2,y2) ) in enumerate( block ):
 
-                    if longest_edge is not None:
-                        x1-=min_x
-                        x2-=min_x
-                        y1-=min_y
-                        y2-=min_y
-                        # Convert video coordinates to xy coordinates (flip y)
-                        y1 = (max_y-min_y)-(y1)
-                        y2 = (max_y-min_y)-(y2)
-                        # Scale
-                        x1*=scaler
-                        x2*=scaler
-                        y1*=scaler
-                        y2*=scaler
+        prev = None
+        for block in get_optimal_ordering(blockset):
 
-                    if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
-                        raise ValueError(f'Coordinates generated which fall outside of supplied printer bed size, adjust printer bed size or add "-longest_edge {min(bed_size_x,bed_size_y)}" to the command to scale the coordinates')
+            lines = []
+            if create_fill:
 
-                    if prev is None or prev!=(x1,y1):
-                        # Perform travel move:
-                        print('traveling ...', (x1,y1))
-                        if prev is not None:
-                            # go up first
-                            o.write(f'G1 X{x_offset+prev[0]:.2f} Y{y_offset+prev[1]:.2f} Z{z_up} F{speed}\n')
-                            plt.plot([prev[0],x1],[prev[1],y2],c='grey')
-                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_up} F{speed}\n')
-                        # Drop pen down at current position
-                        o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{v_z}\n')
+                segarr = np.array( block )
+                coordinates = []
+                for (x1,y1),(x2,y2) in block :
+                    coordinates.append([x1,y1])
+                    coordinates.append([x2,y2])
 
-                    #if prev!=(x1,y1):
-                    #    print(x1,y1)
+                coords = np.array( coordinates )
+                coords = coords[np.isnan( coords ).sum(1)==0]
+                idx = 0
+                for iii, ((ax,ay),(bx,by)) in enumerate(cast_rays(block, coords,ray_distance=ray_distance)):
+                    d = np.sqrt( np.power(ax-bx,2) + np.power(ay-by,2) )
+                    if d<min_fill_segment_size:
+                        continue
+                    if idx%2==0:
+                        lines.append([(ax,ay),(bx,by)])
+                    else:
+                        lines.append([(bx,by),(ax,ay)])
+                    idx+=1
 
-                    o.write(f'G1 X{x_offset+x1:.2f} Y{y_offset+y1:.2f} Z{z_draw} F{speed}\n')
-                    #print(x2,y2)
-                    o.write(f'G1 X{x_offset+x2:.2f} Y{y_offset+y2:.2f} Z{z_draw} F{speed}\n')
-                    plt.plot([x1,x2],[y1,y2],c='r')
-                    prev = (x2,y2)
+            todo=[]
+            if create_outline:
+                todo.append(block)
+            if create_fill:
+                todo.append(lines)
+
+            for ii,( (x1,y1),(x2,y2) ) in enumerate( chain( *todo ) ):
+
+                if longest_edge is not None:
+                    x1-=min_x
+                    x2-=min_x
+                    y1-=min_y
+                    y2-=min_y
+
+                # Convert video coordinates to xy coordinates (flip y)
+                y1 = (max_y-min_y)-(y1)
+                y2 = (max_y-min_y)-(y2)
+                # Scale
+                x1*=scaler
+                x2*=scaler
+                y1*=scaler
+                y2*=scaler
+
+                x1 += x_offset
+                x2 += x_offset
+                y1 += y_offset
+                y2 += y_offset
+                if x1>bed_size_x or y1>bed_size_y or x2>bed_size_x or y2>bed_size_y:
+                    plt.plot([x1,x2],[y1,y2],c='purple')
+                    continue # just ignore ?
+                    #raise ValueError(f'Coordinates generated which fall outside of supplied printer bed size, adjust printer bed size or add "-longest_edge {min(bed_size_x,bed_size_y)}" to the command to scale the coordinates')
+
+                if prev is None or prev!=(x1,y1):
+                    # Perform travel move:
+                    print('traveling ...', (x1,y1))
+                    if prev is not None:
+                        # go up first
+                        # Calculate distance:
+                        dist = np.sqrt( np.power(prev[0]-x1,2) +
+                                       np.power(prev[1]-y1,2))
+                        if dist>10:
+                            print('Large travel', dist)
+                            o.write(f'G1 X{prev[0]:.2f} Y{prev[1]:.2f} Z{z_up+1} F{speed}\n')
+                        else:
+                            o.write(f'G1 X{prev[0]:.2f} Y{prev[1]:.2f} Z{z_up} F{speed}\n')
+                        plt.plot([prev[0],x1],[prev[1],y2],c='grey')
+                    else:
+                        print('Initial travel move +8')
+                        o.write(f'G1 X{x1:.2f} Y{y1:.2f} Z{z_up+8} F{speed}\n')
+                    o.write(f'G1 X{x1:.2f} Y{y1:.2f} Z{z_up} F{speed}\n')
+                    # Drop pen down at current position
+                    o.write(f'G1 X{x1:.2f} Y{y1:.2f} Z{z_draw} F{v_z}\n')
+
+                #if prev!=(x1,y1):
+                #    print(x1,y1)
+
+                o.write(f'G1 X{x1:.2f} Y{y1:.2f} Z{z_draw} F{speed}\n')
+                #print(x2,y2)
+                o.write(f'G1 X{x2:.2f} Y{y2:.2f} Z{z_draw} F{speed}\n')
+                plt.plot([x1,x2],[y1,y2],c='r')
+                prev = (x2,y2)
 
             #o.write(f'#NEXT\n')
 
