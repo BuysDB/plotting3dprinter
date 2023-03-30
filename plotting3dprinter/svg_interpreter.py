@@ -2,6 +2,9 @@ from more_itertools import windowed
 import matplotlib.pyplot as plt
 import numpy as np
 import xml.etree.ElementTree as et
+from collections import namedtuple
+
+Limits = namedtuple('Limits', ['xmin', 'xmax','ymin','ymax'])
 
 def interpolateBezier( points, steps=10, t=None):
     points = tuple(points)
@@ -26,7 +29,10 @@ def interpolateBezier( points, steps=10, t=None):
 def parse_coord(inp):
     return np.array([ float(next(inp)),  float(next(inp))])
 
-def svg_to_coordinate_chomper( inp, yield_control=False,PRECISION=5,verbose=False):
+def svg_to_coordinate_chomper(inp,
+                              yield_control:bool=False,
+                              verbose:bool=False):
+                              PRECISION:int=5,
     prev = None
     try:
         while True:
@@ -288,6 +294,63 @@ def repart(inp):
             yield p
 
 
+def svg_to_coordinate_limits(svg_path, precision, path_filter):
+
+    tree = et.parse(svg_path)
+    # Add namespace for svg
+    ns = {'sn': 'http://www.w3.org/2000/svg'}
+    # get root element
+    root = tree.getroot()
+
+    # Find coordinate extends, for rescaling
+    max_x = None
+    min_x = None
+    max_y = None
+    min_y = None
+
+    for i,path in enumerate(root.findall('.//sn:path', ns)):
+        # Parse the path in d:
+        keep_path = True
+        if path_filter is not None and not path_filter(path):
+            keep_path = False
+        if 'd' not in path.attrib:
+            continue
+
+        d  = path.attrib['d'].replace(',', ' ')
+        parts = d.split()
+        unfiltered_coordinates = []
+        coordinates = []
+        for t in svg_to_coordinate_chomper(
+            inp=repart(parts), PRECISION=precision):
+            #print(t)
+            (x,y),c = t
+            unfiltered_coordinates.append([x,y])
+            if keep_path:
+                coordinates.append([x,y])
+
+        #coordinates = [ [x,y]  for (x,y),c in  svg_to_coordinate_chomper(
+    #        inp=repart(parts), PRECISION=precision)]
+        coordinates = np.array(coordinates)
+        unfiltered_coordinates = np.array(unfiltered_coordinates)
+
+        bot = np.nanmin( unfiltered_coordinates[:,0])
+        if min_x is None or bot<min_x:
+            min_x = bot
+
+        top = np.nanmax( unfiltered_coordinates[:,0])
+        if max_x is None or top>max_x:
+            max_x = top
+
+
+        bot = np.nanmin( unfiltered_coordinates[:,1])
+        if min_y is None or bot<min_y:
+            min_y = bot
+
+        top = np.nanmax( unfiltered_coordinates[:,1])
+        if max_y is None or top>max_y:
+            max_y = top
+
+    return  Limits(min_x, max_x, min_y, max_y)
 
 def svg_to_segment_blocks(svg_path,precision=5, path_filter=None):
     tree = et.parse(svg_path)
@@ -299,12 +362,13 @@ def svg_to_segment_blocks(svg_path,precision=5, path_filter=None):
 
         # Parse the path in d:
         d  = path.attrib['d'].replace(',', ' ')
+
         parts = d.split()
         coordinates = []
         for (x,y),c in svg_to_coordinate_chomper(
             inp=repart(parts), PRECISION=precision):
             coordinates.append([x,y])
-
+        #print(path,d,coordinates)
         if len(coordinates)>0:
             yield np.array(list(coordinates_to_segments( coordinates )))
 
